@@ -313,9 +313,9 @@ Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için `LICENSE` dosy
 
 ## 📞 İletişim
 
-- **Project Lead**: [GitHub Profile]
-- **Issues**: GitHub Issues sayfasını kullanın
-- **Discussions**: GitHub Discussions için hoş geldiniz
+- 📧 Email: cankumet@gmail.com
+- 💼 LinkedIn: [linkedin.com/in/fahri-can-kümet](https://www.linkedin.com/in/fahri-can-k%C3%BCmet/)
+- 🐙 GitHub: [@cankumet](https://github.com/cankumet)
 
 ## 🔗 Useful Links
 
@@ -328,3 +328,6 @@ Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için `LICENSE` dosy
 ---
 
 ⭐ **Bu projeyi beğendiyseniz star vermeyi unutmayın!**
+
+## 🧑‍💻 Geliştirici
+**Fahri Can KÜMET [@cankumet](https://github.com/cankumet)**
