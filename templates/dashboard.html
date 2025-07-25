@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 Fraud Detection Dashboard</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .navbar-brand {
+            color: white !important;
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+        }
+
+        .stat-card.success {
+            background: linear-gradient(135deg, #00d4aa, #01a3a4);
+        }
+
+        .stat-card.warning {
+            background: linear-gradient(135deg, #feca57, #ff9ff3);
+        }
+
+        .stat-card.info {
+            background: linear-gradient(135deg, #3742fa, #2f3542);
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 10px;
+        }
+
+        .fraud-row {
+            background: rgba(255, 107, 107, 0.1);
+            animation: highlight 3s ease-in-out;
+        }
+
+        @keyframes highlight {
+            0% { background: rgba(255, 107, 107, 0.3); }
+            100% { background: rgba(255, 107, 107, 0.1); }
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .live-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00d4aa;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            z-index: 1000;
+            animation: pulse 2s infinite;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Live Indicator -->
+    <div class="live-indicator">
+        <i class="fas fa-circle text-success me-2"></i>
+        <span id="liveStatus">Canlı İzleme Aktif</span>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-shield-alt me-2"></i>
+                Fraud Detection Dashboard
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text text-white">
+                    <i class="fas fa-clock me-1"></i>
+                    <span id="currentTime"></span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- İstatistik Kartları -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                        <h3 id="totalFrauds" class="mb-1">0</h3>
+                        <p class="mb-0">Toplam Fraud</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card success">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x mb-3"></i>
+                        <h3 id="recentFrauds" class="mb-1">0</h3>
+                        <p class="mb-0">Son 24 Saat</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card warning">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-line fa-2x mb-3"></i>
+                        <h3 id="avgAmount" class="mb-1">0.00</h3>
+                        <p class="mb-0">Ort. Tutar</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card info pulse" id="liveCounter">
+                    <div class="card-body text-center">
+                        <i class="fas fa-broadcast-tower fa-2x mb-3"></i>
+                        <h3 id="liveCount" class="mb-1">0</h3>
+                        <p class="mb-0">Canlı Sayaç</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grafikler -->
+        <div class="row mb-4">
+            <div class="col-md-8 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-area me-2"></i>
+                            Son 7 Günlük Fraud Trendi
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            Risk Dağılımı
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="pieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fraud Alerts Tablosu -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>
+                            Son Fraud Alerts
+                        </h5>
+                        <button class="btn btn-primary btn-sm" onclick="loadAlerts()">
+                            <i class="fas fa-sync-alt me-1"></i>
+                            Yenile
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-dark sticky-top">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Zaman</th>
+                                        <th>Tutar (Norm)</th>
+                                        <th>V1</th>
+                                        <th>V2</th>
+                                        <th>V3</th>
+                                        <th>V4</th>
+                                        <th>Gerçek Sınıf</th>
+                                        <th>Tahmin</th>
+                                        <th>Durum</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alertsTable">
+                                    <tr>
+                                        <td colspan="10" class="loading">
+                                            <i class="fas fa-spinner fa-spin me-2"></i>
+                                            Veriler yükleniyor...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Socket.IO bağlantısı
+        const socket = io();
+        let trendChart, pieChart;
+
+        // Sayfa yüklendiğinde
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTime();
+            setInterval(updateTime, 1000);
+            loadStats();
+            loadAlerts();
+            initCharts();
+        });
+
+        // Zaman güncelleme
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent =
+                now.toLocaleString('tr-TR');
+        }
+
+        // İstatistikleri yükle
+        async function loadStats() {
+            try {
+                const response = await fetch('/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.stats;
+                    document.getElementById('totalFrauds').textContent = stats.total_frauds;
+                    document.getElementById('recentFrauds').textContent = stats.recent_frauds;
+                    document.getElementById('avgAmount').textContent =
+                        (stats.averages.avg_amount || 0).toFixed(2);
+
+                    updateCharts(stats);
+                }
+            } catch (error) {
+                console.error('Stats yükleme hatası:', error);
+            }
+        }
+
+        // Alerts tablosunu yükle
+        async function loadAlerts() {
+            try {
+                const response = await fetch('/alerts');
+                const data = await response.json();
+
+                if (data.success) {
+                    const tbody = document.getElementById('alertsTable');
+                    tbody.innerHTML = '';
+
+                    data.data.forEach((alert, index) => {
+                        const row = document.createElement('tr');
+                        row.className = 'fraud-row';
+                        row.innerHTML = `
+                            <td>${index + 1}</td>
+                            <td>${new Date(alert._id).toLocaleString('tr-TR')}</td>
+                            <td>${(alert.normAmount || 0).toFixed(3)}</td>
+                            <td>${(alert.V1 || 0).toFixed(2)}</td>
+                            <td>${(alert.V2 || 0).toFixed(2)}</td>
+                            <td>${(alert.V3 || 0).toFixed(2)}</td>
+                            <td>${(alert.V4 || 0).toFixed(2)}</td>
+                            <td><span class="badge bg-danger">${alert.Class || 1}</span></td>
+                            <td><span class="badge bg-warning">${alert.prediction || 1}</span></td>
+                            <td><span class="badge bg-danger">FRAUD</span></td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+            } catch (error) {
+                console.error('Alerts yükleme hatası:', error);
+                document.getElementById('alertsTable').innerHTML =
+                    '<tr><td colspan="10" class="text-danger text-center">Veri yükleme hatası!</td></tr>';
+            }
+        }
+
+        // Grafikleri başlat
+        function initCharts() {
+            // Trend Chart
+            const trendCtx = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Fraud Sayısı',
+                        data: [],
+                        borderColor: '#ff6b6b',
+                        backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Pie Chart
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            pieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Yüksek Risk', 'Orta Risk', 'Düşük Risk'],
+                    datasets: [{
+                        data: [30, 45, 25],
+                        backgroundColor: ['#ff6b6b', '#feca57', '#00d4aa'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Grafikleri güncelle
+        function updateCharts(stats) {
+            if (stats.time_distribution && trendChart) {
+                trendChart.data.labels = stats.time_distribution.map(d => d.date);
+                trendChart.data.datasets[0].data = stats.time_distribution.map(d => d.count);
+                trendChart.update();
+            }
+        }
+
+        // Socket.IO event handlers
+        socket.on('fraud_count', function(data) {
+            document.getElementById('liveCount').textContent = data.count;
+        });
+
+        socket.on('new_fraud', function(data) {
+            document.getElementById('liveCount').textContent = data.count;
+
+            // Bildirim göster
+            if (data.new_frauds > 0) {
+                showNotification(`🚨 ${data.new_frauds} yeni fraud tespit edildi!`);
+                loadAlerts(); // Tabloyu güncelle
+                loadStats(); // İstatistikleri güncelle
+            }
+        });
+
+        // Bildirim göster
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+            notification.style.cssText = 'top: 80px; right: 20px; z-index: 1050; min-width: 300px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        // Periyodik güncelleme
+        setInterval(() => {
+            loadStats();
+        }, 30000); // 30 saniyede bir
+    </script>
+</body>
+</html>

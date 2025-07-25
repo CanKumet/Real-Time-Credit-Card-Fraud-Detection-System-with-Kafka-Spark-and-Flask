@@ -1,0 +1,26 @@
+# Core Python packages
+pandas
+numpy
+scikit-learn
+# Apache Spark
+pyspark
+# Kafka
+kafka-python
+# MongoDB
+pymongo
+# Flask Web Framework
+Flask
+Flask-SocketIO
+# Web Server
+python-socketio
+eventlet
+# Machine Learning (additional)
+joblib
+# Data Processing
+pytz
+# Development & Debugging
+python-dotenv
+# Optional: Jupyter for development
+jupyter
+matplotlib
+seaborn
